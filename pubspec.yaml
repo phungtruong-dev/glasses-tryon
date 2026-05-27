@@ -1,0 +1,37 @@
+name: glasses_tryon
+description: "Thử kính mắt online bằng AR - quét cửa hàng & áp kính lên khuôn mặt real-time."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+
+  # Camera real-time
+  camera: ^0.11.0+2
+
+  # Nhận diện khuôn mặt + landmark (mắt, mũi, góc nghiêng đầu)
+  google_mlkit_face_detection: ^0.11.0
+
+  # Scrape web cửa hàng
+  http: ^1.2.2
+  html: ^0.15.4
+
+  # Chụp ảnh kết quả: xử lý ảnh, lưu, chia sẻ
+  image: ^4.3.0            # bake orientation + encode PNG
+  path_provider: ^2.1.4    # thư mục tạm
+  gal: ^2.3.0              # lưu ảnh vào thư viện
+  share_plus: ^10.1.2      # chia sẻ ảnh
+
+dev_dependencies:
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  # Nếu bạn có ảnh kính PNG tách nền, đặt vào assets/glasses/ rồi mở comment dưới:
+  # assets:
+  #   - assets/glasses/
