@@ -1,18 +1,21 @@
 import 'dart:io';
 import 'dart:ui' as ui;
+import 'package:flutter/material.dart';
 import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 
-/// Kết quả 1 lần chụp đã chuẩn hoá: ảnh dựng đứng + mặt đã detect.
-/// QUAN TRỌNG: faces nằm trong KHÔNG GIAN pixel của [image] (đã bake orientation),
-/// nên có thể vẽ thẳng lên ảnh theo tỉ lệ 1:1.
+import '../models/face_result.dart';
+import 'macos_face_detector.dart';
+
+/// Normalised result of a single capture: upright image + detected face data.
+/// [faces] coordinates are in pixel space of [image] (top-left origin).
 class ProcessedShot {
-  final File pngFile; // ảnh upright (.png, không còn EXIF orientation)
-  final ui.Image image; // bitmap để vẽ canvas
+  final File pngFile;
+  final ui.Image image;
   final int width;
   final int height;
-  final List<Face> faces;
+  final List<FaceResult> faces;
 
   ProcessedShot({
     required this.pngFile,
@@ -24,48 +27,74 @@ class ProcessedShot {
 }
 
 class CaptureService {
-  final FaceDetector _detector = FaceDetector(
-    options: FaceDetectorOptions(
-      enableLandmarks: true,
-      performanceMode: FaceDetectorMode.accurate, // ảnh tĩnh -> ưu tiên chính xác
-    ),
-  );
+  // MLKit detector: only created on iOS/Android.
+  FaceDetector? _mlkitDetector;
+  MacOSFaceDetector? _macosDetector;
 
-  void dispose() => _detector.close();
+  CaptureService() {
+    if (Platform.isMacOS) {
+      _macosDetector = MacOSFaceDetector();
+    } else {
+      _mlkitDetector = FaceDetector(
+        options: FaceDetectorOptions(
+          enableLandmarks: true,
+          performanceMode: FaceDetectorMode.accurate,
+        ),
+      );
+    }
+  }
 
-  /// [rawPhoto] là file từ CameraController.takePicture().
+  void dispose() => _mlkitDetector?.close();
+
+  /// Process a raw photo file: bake orientation, detect faces, return result.
   Future<ProcessedShot> processPhoto(File rawPhoto) async {
     final bytes = await rawPhoto.readAsBytes();
 
-    // 1) Bake EXIF orientation -> ảnh dựng đứng, loại bỏ lệch xoay.
     var decoded = img.decodeImage(bytes);
-    if (decoded == null) {
-      throw Exception('Không đọc được ảnh chụp.');
-    }
+    if (decoded == null) throw Exception('Không đọc được ảnh chụp.');
     decoded = img.bakeOrientation(decoded);
 
-    // 2) Lưu PNG upright vào thư mục tạm.
     final dir = await getTemporaryDirectory();
     final path =
         '${dir.path}/shot_${DateTime.now().millisecondsSinceEpoch}.png';
     final pngBytes = img.encodePng(decoded);
     final pngFile = await File(path).writeAsBytes(pngBytes);
 
-    // 3) Detect mặt trên ảnh upright.
-    final faces =
-        await _detector.processImage(InputImage.fromFilePath(pngFile.path));
+    final faces = await _detectFaces(pngFile.path);
 
-    // 4) Decode sang ui.Image để vẽ.
     final codec = await ui.instantiateImageCodec(pngBytes);
     final frame = await codec.getNextFrame();
-    final uiImage = frame.image;
 
     return ProcessedShot(
       pngFile: pngFile,
-      image: uiImage,
+      image: frame.image,
       width: decoded.width,
       height: decoded.height,
       faces: faces,
     );
+  }
+
+  Future<List<FaceResult>> _detectFaces(String pngPath) async {
+    if (Platform.isMacOS) {
+      return _macosDetector!.detectFromFile(pngPath);
+    }
+    final mlkitFaces = await _mlkitDetector!
+        .processImage(InputImage.fromFilePath(pngPath));
+    return mlkitFaces
+        .where((f) =>
+            f.landmarks[FaceLandmarkType.leftEye] != null &&
+            f.landmarks[FaceLandmarkType.rightEye] != null)
+        .map((f) => FaceResult(
+              leftEye: Offset(
+                f.landmarks[FaceLandmarkType.leftEye]!.position.x.toDouble(),
+                f.landmarks[FaceLandmarkType.leftEye]!.position.y.toDouble(),
+              ),
+              rightEye: Offset(
+                f.landmarks[FaceLandmarkType.rightEye]!.position.x.toDouble(),
+                f.landmarks[FaceLandmarkType.rightEye]!.position.y.toDouble(),
+              ),
+              yaw: f.headEulerAngleY ?? 0,
+            ))
+        .toList();
   }
 }

@@ -3,23 +3,26 @@ import 'package:camera/camera.dart';
 import 'package:flutter/services.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 
-/// Bọc Google ML Kit Face Detection.
-///
-/// Phần khó nhất của AR real-time KHÔNG phải là detect mặt, mà là chuyển
-/// [CameraImage] (định dạng raw theo từng nền tảng) sang [InputImage] đúng
-/// xoay/format. Code dưới đây xử lý đúng cho Android (NV21) và iOS (BGRA8888).
+/// Wraps Google ML Kit Face Detection for iOS/Android real-time camera frames.
+/// Not used on macOS (Vision framework handles detection there).
 class FaceDetectorService {
-  final FaceDetector _detector = FaceDetector(
-    options: FaceDetectorOptions(
-      enableLandmarks: true, // lấy điểm mắt, mũi, tai...
-      enableContours: false,
-      enableClassification: false,
-      enableTracking: true,
-      performanceMode: FaceDetectorMode.fast, // ưu tiên tốc độ cho real-time
-    ),
-  );
+  // MLKit FaceDetector is only created on non-macOS platforms.
+  FaceDetector? _detector;
 
-  // Bảng bù xoay theo hướng thiết bị (Android).
+  FaceDetectorService() {
+    if (!Platform.isMacOS) {
+      _detector = FaceDetector(
+        options: FaceDetectorOptions(
+          enableLandmarks: true,
+          enableContours: false,
+          enableClassification: false,
+          enableTracking: true,
+          performanceMode: FaceDetectorMode.fast,
+        ),
+      );
+    }
+  }
+
   static const _orientations = {
     DeviceOrientation.portraitUp: 0,
     DeviceOrientation.landscapeLeft: 90,
@@ -27,12 +30,13 @@ class FaceDetectorService {
     DeviceOrientation.landscapeRight: 270,
   };
 
-  Future<List<Face>> detect(InputImage image) => _detector.processImage(image);
+  Future<List<Face>> detect(InputImage image) =>
+      _detector!.processImage(image);
 
-  void dispose() => _detector.close();
+  void dispose() => _detector?.close();
 
-  /// Chuyển frame camera -> InputImage. Trả null nếu frame không hợp lệ
-  /// (caller nên bỏ qua frame đó).
+  /// Converts a camera frame to InputImage for MLKit. Returns null if the
+  /// frame format is incompatible (caller should skip that frame).
   InputImage? inputImageFromCameraImage(
     CameraImage image,
     CameraDescription camera,
@@ -57,8 +61,6 @@ class FaceDetectorService {
 
     final format = InputImageFormatValue.fromRawValue(image.format.raw);
     if (format == null) return null;
-    // Android: cần NV21 (set imageFormatGroup: ImageFormatGroup.nv21 ở controller)
-    // iOS: cần BGRA8888
     if ((Platform.isAndroid && format != InputImageFormat.nv21) ||
         (Platform.isIOS && format != InputImageFormat.bgra8888)) {
       return null;

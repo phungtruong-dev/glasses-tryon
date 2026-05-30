@@ -11,11 +11,13 @@ import '../services/capture_service.dart';
 import '../services/face_detector_service.dart';
 import '../utils/image_loader.dart';
 import '../widgets/glasses_painter.dart';
+import '../widgets/glasses_selector.dart';
+import '../widgets/macos_ar_body.dart';
 import 'result_screen.dart';
 
 class TryOnScreen extends StatefulWidget {
   final Glasses initialGlasses;
-  final List<Glasses>? catalog; // danh sách để chọn nhanh; null -> demo
+  final List<Glasses>? catalog;
   const TryOnScreen({super.key, required this.initialGlasses, this.catalog});
 
   @override
@@ -24,11 +26,12 @@ class TryOnScreen extends StatefulWidget {
 
 class _TryOnScreenState extends State<TryOnScreen>
     with WidgetsBindingObserver {
+  // Mobile (iOS/Android) only — null on macOS.
   CameraController? _controller;
-  final _faceService = FaceDetectorService();
+  FaceDetectorService? _faceService;
 
   bool _initializing = true;
-  bool _busy = false; // tránh xử lý chồng frame
+  bool _busy = false;
   String? _error;
 
   List<Face> _faces = [];
@@ -37,9 +40,8 @@ class _TryOnScreenState extends State<TryOnScreen>
   late CameraDescription _camera;
 
   late Glasses _selected;
-
   final _capture = CaptureService();
-  ui.Image? _overlayImage; // ảnh PNG kính (nếu có) cho mẫu đang chọn
+  ui.Image? _overlayImage;
   bool _capturing = false;
 
   @override
@@ -59,7 +61,7 @@ class _TryOnScreenState extends State<TryOnScreen>
   void _select(Glasses g) {
     setState(() {
       _selected = g;
-      _overlayImage = null; // xoá overlay cũ trong lúc nạp mới
+      _overlayImage = null;
     });
     _loadOverlay(g);
   }
@@ -69,9 +71,7 @@ class _TryOnScreenState extends State<TryOnScreen>
     if (c == null || _capturing) return;
     setState(() => _capturing = true);
     try {
-      if (c.value.isStreamingImages) {
-        await c.stopImageStream();
-      }
+      if (c.value.isStreamingImages) await c.stopImageStream();
       final file = await c.takePicture();
       final shot = await _capture.processPhoto(File(file.path));
       if (!mounted) return;
@@ -82,7 +82,6 @@ class _TryOnScreenState extends State<TryOnScreen>
           overlayImage: _overlayImage,
         ),
       ));
-      // Quay lại -> bật lại stream.
       if (mounted && c.value.isInitialized && !c.value.isStreamingImages) {
         await c.startImageStream(_processCameraImage);
       }
@@ -100,6 +99,12 @@ class _TryOnScreenState extends State<TryOnScreen>
   }
 
   Future<void> _start() async {
+    // macOS uses MacOSArBody which manages its own camera lifecycle.
+    if (Platform.isMacOS) {
+      setState(() => _initializing = false);
+      return;
+    }
+
     if (cameras.isEmpty) {
       setState(() {
         _initializing = false;
@@ -107,7 +112,8 @@ class _TryOnScreenState extends State<TryOnScreen>
       });
       return;
     }
-    // Ưu tiên camera trước.
+
+    _faceService = FaceDetectorService();
     _camera = cameras.firstWhere(
       (c) => c.lensDirection == CameraLensDirection.front,
       orElse: () => cameras.first,
@@ -139,22 +145,21 @@ class _TryOnScreenState extends State<TryOnScreen>
   }
 
   Future<void> _processCameraImage(CameraImage image) async {
-    if (_busy) return;
+    if (_busy || _faceService == null) return;
     _busy = true;
 
-    final inputImage = _faceService.inputImageFromCameraImage(
+    final inputImage = _faceService!.inputImageFromCameraImage(
       image,
       _camera,
       _controller?.value.deviceOrientation ?? DeviceOrientation.portraitUp,
     );
-
     if (inputImage == null) {
       _busy = false;
       return;
     }
 
     try {
-      final faces = await _faceService.detect(inputImage);
+      final faces = await _faceService!.detect(inputImage);
       if (mounted) {
         setState(() {
           _faces = faces;
@@ -164,7 +169,7 @@ class _TryOnScreenState extends State<TryOnScreen>
         });
       }
     } catch (_) {
-      // bỏ qua frame lỗi
+      // skip bad frame
     } finally {
       _busy = false;
     }
@@ -187,7 +192,7 @@ class _TryOnScreenState extends State<TryOnScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _controller?.dispose();
-    _faceService.dispose();
+    _faceService?.dispose();
     _capture.dispose();
     super.dispose();
   }
@@ -201,23 +206,37 @@ class _TryOnScreenState extends State<TryOnScreen>
         foregroundColor: Colors.white,
         title: Text(_selected.name),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: (_initializing || _error != null)
-          ? null
-          : Padding(
-              padding: const EdgeInsets.only(bottom: 104),
-              child: FloatingActionButton.large(
-                onPressed: _capturing ? null : _onCapture,
-                child: _capturing
-                    ? const CircularProgressIndicator()
-                    : const Icon(Icons.camera_alt),
-              ),
-            ),
+      // macOS: FAB lives inside MacOSArBody.
+      floatingActionButtonLocation: (!Platform.isMacOS)
+          ? FloatingActionButtonLocation.centerFloat
+          : null,
+      floatingActionButton:
+          (Platform.isMacOS || _initializing || _error != null)
+              ? null
+              : Padding(
+                  padding: const EdgeInsets.only(bottom: 104),
+                  child: FloatingActionButton.large(
+                    onPressed: _capturing ? null : _onCapture,
+                    child: _capturing
+                        ? const CircularProgressIndicator()
+                        : const Icon(Icons.camera_alt),
+                  ),
+                ),
       body: _buildBody(),
     );
   }
 
   Widget _buildBody() {
+    // macOS: delegate entirely to MacOSArBody.
+    if (Platform.isMacOS) {
+      return MacOSArBody(
+        selected: _selected,
+        catalog: widget.catalog,
+        overlayImage: _overlayImage,
+        onSelectGlasses: _select,
+      );
+    }
+
     if (_initializing) {
       return const Center(
           child: CircularProgressIndicator(color: Colors.white));
@@ -232,12 +251,15 @@ class _TryOnScreenState extends State<TryOnScreen>
         ),
       );
     }
+
     final controller = _controller!;
+    final catalog = (widget.catalog != null && widget.catalog!.isNotEmpty)
+        ? widget.catalog!
+        : kDemoGlasses;
 
     return Stack(
       fit: StackFit.expand,
       children: [
-        // Preview + overlay được căn theo tỉ lệ camera.
         Center(
           child: CameraPreview(
             controller,
@@ -245,9 +267,7 @@ class _TryOnScreenState extends State<TryOnScreen>
               builder: (context, constraints) {
                 final canvasSize =
                     Size(constraints.maxWidth, constraints.maxHeight);
-                if (_imageSize == Size.zero) {
-                  return const SizedBox.expand();
-                }
+                if (_imageSize == Size.zero) return const SizedBox.expand();
                 return CustomPaint(
                   size: canvasSize,
                   painter: GlassesPainter(
@@ -263,8 +283,6 @@ class _TryOnScreenState extends State<TryOnScreen>
             ),
           ),
         ),
-
-        // Trạng thái phát hiện mặt
         Positioned(
           top: 12,
           left: 0,
@@ -286,78 +304,17 @@ class _TryOnScreenState extends State<TryOnScreen>
             ),
           ),
         ),
-
-        // Thanh chọn nhanh các mẫu kính
         Positioned(
           left: 0,
           right: 0,
           bottom: 0,
-          child: _GlassesSelector(
-            options: (widget.catalog != null && widget.catalog!.isNotEmpty)
-                ? widget.catalog!
-                : kDemoGlasses,
+          child: GlassesSelector(
+            options: catalog,
             selectedId: _selected.id,
             onSelect: _select,
           ),
         ),
       ],
-    );
-  }
-}
-
-/// Thanh chọn kính ở dưới màn hình. Ở demo dùng kDemoGlasses + mẫu đang chọn.
-class _GlassesSelector extends StatelessWidget {
-  final List<Glasses> options;
-  final String selectedId;
-  final ValueChanged<Glasses> onSelect;
-  const _GlassesSelector({
-    required this.options,
-    required this.selectedId,
-    required this.onSelect,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 96,
-      color: Colors.black54,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        itemCount: options.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 10),
-        itemBuilder: (context, i) {
-          final g = options[i];
-          final active = g.id == selectedId;
-          return GestureDetector(
-            onTap: () => onSelect(g),
-            child: Container(
-              width: 90,
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: active ? Colors.white : Colors.transparent,
-                  width: 2,
-                ),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.remove_red_eye, color: g.frameColor),
-                  const SizedBox(height: 4),
-                  Text(
-                    g.name,
-                    style: const TextStyle(color: Colors.white, fontSize: 10),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
     );
   }
 }

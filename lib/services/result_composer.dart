@@ -2,13 +2,12 @@ import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 
 import '../models/glasses.dart';
 import '../widgets/glasses_drawing.dart';
 import 'capture_service.dart';
 
-/// Ghép kính lên ảnh đã chụp ([ProcessedShot]) -> trả về ui.Image + file PNG.
+/// Composites glasses onto a [ProcessedShot] and returns the result image+file.
 class ResultComposer {
   static Future<({ui.Image image, File file})> compose(
     ProcessedShot shot,
@@ -18,21 +17,17 @@ class ResultComposer {
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
 
-    // Vẽ ảnh gốc.
     canvas.drawImage(shot.image, Offset.zero, Paint());
 
-    // Vẽ kính lên từng mặt (toạ độ landmark cùng không gian pixel với ảnh).
+    // FaceResult.leftEye / rightEye are already in pixel space of shot.image.
     for (final face in shot.faces) {
-      final l = face.landmarks[FaceLandmarkType.leftEye]?.position;
-      final r = face.landmarks[FaceLandmarkType.rightEye]?.position;
-      if (l == null || r == null) continue;
       drawGlassesAtEyes(
         canvas,
-        Offset(l.x.toDouble(), l.y.toDouble()),
-        Offset(r.x.toDouble(), r.y.toDouble()),
+        face.leftEye,
+        face.rightEye,
         glasses,
         overlayImage: overlayImage,
-        headYaw: face.headEulerAngleY ?? 0,
+        headYaw: face.yaw,
       );
     }
 

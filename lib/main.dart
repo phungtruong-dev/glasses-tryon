@@ -1,18 +1,21 @@
+import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 
 import 'screens/home_screen.dart';
 
-/// Danh sách camera lấy 1 lần khi mở app, dùng chung cho màn AR.
+/// Camera list used by mobile (iOS/Android) AR screens.
+/// Empty on macOS — camera_macos handles discovery there.
 List<CameraDescription> cameras = [];
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  try {
-    cameras = await availableCameras();
-  } catch (e) {
-    // Thiết bị/emulator không có camera -> vẫn vào app, màn try-on sẽ báo lỗi.
-    debugPrint('Không lấy được camera: $e');
+  if (!Platform.isMacOS) {
+    try {
+      cameras = await availableCameras();
+    } catch (e) {
+      debugPrint('Không lấy được camera: $e');
+    }
   }
   runApp(const GlassesTryOnApp());
 }

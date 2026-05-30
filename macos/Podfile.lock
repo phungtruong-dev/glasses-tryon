@@ -1,4 +1,6 @@
 PODS:
+  - camera_macos (0.0.1):
+    - FlutterMacOS
   - FlutterMacOS (1.0.0)
   - gal (1.0.0):
     - Flutter
@@ -7,11 +9,14 @@ PODS:
     - FlutterMacOS
 
 DEPENDENCIES:
+  - camera_macos (from `Flutter/ephemeral/.symlinks/plugins/camera_macos/macos`)
   - FlutterMacOS (from `Flutter/ephemeral`)
   - gal (from `Flutter/ephemeral/.symlinks/plugins/gal/darwin`)
   - share_plus (from `Flutter/ephemeral/.symlinks/plugins/share_plus/macos`)
 
 EXTERNAL SOURCES:
+  camera_macos:
+    :path: Flutter/ephemeral/.symlinks/plugins/camera_macos/macos
   FlutterMacOS:
     :path: Flutter/ephemeral
   gal:
@@ -20,6 +25,7 @@ EXTERNAL SOURCES:
     :path: Flutter/ephemeral/.symlinks/plugins/share_plus/macos
 
 SPEC CHECKSUMS:
+  camera_macos: c2603f5eed16f05076cf17e12030d2ce55a77839
   FlutterMacOS: d0db08ddef1a9af05a5ec4b724367152bb0500b1
   gal: 6a522c75909f1244732d4596d11d6a2f86ff37a5
   share_plus: 1fa619de8392a4398bfaf176d441853922614e89

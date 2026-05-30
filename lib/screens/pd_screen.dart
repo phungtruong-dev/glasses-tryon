@@ -1,14 +1,12 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 
 import '../services/capture_service.dart';
 import '../services/pd_estimator.dart';
 
-/// Đo PD bằng phương pháp hiệu chuẩn thẻ (ID-1 = 85.60 mm).
-///
-/// Vì tỉ lệ PD(px) / cạnh-thẻ(px) KHÔNG đổi theo cỡ ảnh hiển thị, ta đo trực
-/// tiếp trong toạ độ widget — không cần quy đổi về pixel ảnh gốc.
+/// Measure pupillary distance using a credit-card calibration method.
+/// PD(px) / card-edge(px) ratio is display-size-independent, so all
+/// measurements happen directly in widget coordinates.
 class PdScreen extends StatefulWidget {
   final ProcessedShot shot;
   const PdScreen({super.key, required this.shot});
@@ -18,8 +16,8 @@ class PdScreen extends StatefulWidget {
 }
 
 class _PdScreenState extends State<PdScreen> {
-  Offset? _pupilL, _pupilR; // chấm đồng tử (display coords)
-  Offset? _cardA, _cardB; // 2 mép thẻ (display coords)
+  Offset? _pupilL, _pupilR;
+  Offset? _cardA, _cardB;
   bool _placed = false;
 
   void _placeInitial(Size container) {
@@ -30,20 +28,19 @@ class _PdScreenState extends State<PdScreen> {
     final dispW = iw * scale, dispH = ih * scale;
     final ox = (container.width - dispW) / 2;
     final oy = (container.height - dispH) / 2;
-    Offset toDisp(double x, double y) => Offset(ox + x * scale, oy + y * scale);
+    Offset toDisp(double x, double y) =>
+        Offset(ox + x * scale, oy + y * scale);
 
-    // Lấy đồng tử từ mặt đầu tiên nếu có.
-    Face? face = widget.shot.faces.isNotEmpty ? widget.shot.faces.first : null;
-    final l = face?.landmarks[FaceLandmarkType.leftEye]?.position;
-    final r = face?.landmarks[FaceLandmarkType.rightEye]?.position;
-    if (l != null && r != null) {
-      _pupilL = toDisp(l.x.toDouble(), l.y.toDouble());
-      _pupilR = toDisp(r.x.toDouble(), r.y.toDouble());
+    // Use FaceResult.leftEye/rightEye (already pixel coords in image space).
+    final face =
+        widget.shot.faces.isNotEmpty ? widget.shot.faces.first : null;
+    if (face != null) {
+      _pupilL = toDisp(face.leftEye.dx, face.leftEye.dy);
+      _pupilR = toDisp(face.rightEye.dx, face.rightEye.dy);
     } else {
       _pupilL = Offset(container.width * 0.4, container.height * 0.4);
       _pupilR = Offset(container.width * 0.6, container.height * 0.4);
     }
-    // Mép thẻ mặc định (người dùng kéo cho khớp tấm thẻ đang cầm).
     _cardA = Offset(container.width * 0.3, container.height * 0.75);
     _cardB = Offset(container.width * 0.7, container.height * 0.75);
     _placed = true;
@@ -85,16 +82,19 @@ class _PdScreenState extends State<PdScreen> {
                         ),
                       ),
                     ),
-                    // Đường nối đồng tử & cạnh thẻ.
                     CustomPaint(
                       size: size,
                       painter: _LinesPainter(
                           _pupilL!, _pupilR!, _cardA!, _cardB!),
                     ),
-                    _handle(_pupilL!, Colors.cyan, (o) => setState(() => _pupilL = o)),
-                    _handle(_pupilR!, Colors.cyan, (o) => setState(() => _pupilR = o)),
-                    _handle(_cardA!, Colors.amber, (o) => setState(() => _cardA = o)),
-                    _handle(_cardB!, Colors.amber, (o) => setState(() => _cardB = o)),
+                    _handle(_pupilL!, Colors.cyan,
+                        (o) => setState(() => _pupilL = o)),
+                    _handle(_pupilR!, Colors.cyan,
+                        (o) => setState(() => _pupilR = o)),
+                    _handle(_cardA!, Colors.amber,
+                        (o) => setState(() => _cardA = o)),
+                    _handle(_cardB!, Colors.amber,
+                        (o) => setState(() => _cardB = o)),
                     Positioned(
                       top: 8,
                       left: 8,
@@ -122,7 +122,7 @@ class _PdScreenState extends State<PdScreen> {
           width: r * 2,
           height: r * 2,
           decoration: BoxDecoration(
-            color: color.withOpacity(0.35),
+            color: color.withValues(alpha: 0.35),
             shape: BoxShape.circle,
             border: Border.all(color: color, width: 2),
           ),
@@ -130,8 +130,7 @@ class _PdScreenState extends State<PdScreen> {
             child: Container(
               width: 4,
               height: 4,
-              decoration:
-                  BoxDecoration(color: color, shape: BoxShape.circle),
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
             ),
           ),
         ),
@@ -143,7 +142,7 @@ class _PdScreenState extends State<PdScreen> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.6),
+        color: Colors.black.withValues(alpha: 0.6),
         borderRadius: BorderRadius.circular(12),
       ),
       child: DefaultTextStyle(
@@ -152,7 +151,8 @@ class _PdScreenState extends State<PdScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text('🟦 Kéo 2 chấm xanh vào tâm 2 đồng tử.'),
-            const Text('🟨 Kéo 2 chấm vàng trùng 2 mép NGANG của thẻ ngân hàng.'),
+            const Text(
+                '🟨 Kéo 2 chấm vàng trùng 2 mép NGANG của thẻ ngân hàng.'),
             const SizedBox(height: 6),
             Text('PD ước lượng: ${res.pdMm} mm',
                 style: const TextStyle(
@@ -161,8 +161,8 @@ class _PdScreenState extends State<PdScreen> {
                 'bề rộng tròng ~${res.lensWidthMin}–${res.lensWidthMax} mm'),
             const SizedBox(height: 4),
             const Text(
-              'Lưu ý: đây là ƯỚC LƯỢNG để chọn size, không thay thế đo khám tại '
-              'cửa hàng/bác sĩ.',
+              'Lưu ý: đây là ƯỚC LƯỢNG để chọn size, không thay thế đo khám '
+              'tại cửa hàng/bác sĩ.',
               style: TextStyle(fontSize: 11, color: Colors.white70),
             ),
           ],

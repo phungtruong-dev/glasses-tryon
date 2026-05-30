@@ -11,8 +11,11 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.8
 
-  # Camera real-time
+  # Camera real-time (iOS/Android)
   camera: ^0.11.0+2
+
+  # Camera for macOS desktop
+  camera_macos: ^0.0.9
 
   # Nhận diện khuôn mặt + landmark (mắt, mũi, góc nghiêng đầu)
   google_mlkit_face_detection: ^0.11.0
