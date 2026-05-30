@@ -1,0 +1,29 @@
+PODS:
+  - FlutterMacOS (1.0.0)
+  - gal (1.0.0):
+    - Flutter
+    - FlutterMacOS
+  - share_plus (0.0.1):
+    - FlutterMacOS
+
+DEPENDENCIES:
+  - FlutterMacOS (from `Flutter/ephemeral`)
+  - gal (from `Flutter/ephemeral/.symlinks/plugins/gal/darwin`)
+  - share_plus (from `Flutter/ephemeral/.symlinks/plugins/share_plus/macos`)
+
+EXTERNAL SOURCES:
+  FlutterMacOS:
+    :path: Flutter/ephemeral
+  gal:
+    :path: Flutter/ephemeral/.symlinks/plugins/gal/darwin
+  share_plus:
+    :path: Flutter/ephemeral/.symlinks/plugins/share_plus/macos
+
+SPEC CHECKSUMS:
+  FlutterMacOS: d0db08ddef1a9af05a5ec4b724367152bb0500b1
+  gal: 6a522c75909f1244732d4596d11d6a2f86ff37a5
+  share_plus: 1fa619de8392a4398bfaf176d441853922614e89
+
+PODFILE CHECKSUM: 0af13ea7a15fad8c02a495a737daafd743f372ad
+
+COCOAPODS: 1.16.2

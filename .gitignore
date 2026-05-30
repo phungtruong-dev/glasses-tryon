@@ -1,4 +1,8 @@
 .claude/
 .opencode/
 .git/
+.dart_tool/
+.idea/
+.vscode/
 .DS_Store
+build/

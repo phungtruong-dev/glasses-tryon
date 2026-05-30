@@ -26,8 +26,18 @@ class ScrapeResult {
 /// - Nếu không ra gì -> trả về catalog mẫu để app vẫn dùng được.
 class StoreScraper {
   static const _eyewearKeywords = [
-    'kính', 'kinh mat', 'kính mắt', 'gọng', 'glass', 'glasses',
-    'eyewear', 'eyeglass', 'frame', 'sunglass', 'optic', 'spectacle',
+    'kính',
+    'kinh mat',
+    'kính mắt',
+    'gọng',
+    'glass',
+    'glasses',
+    'eyewear',
+    'eyeglass',
+    'frame',
+    'sunglass',
+    'optic',
+    'spectacle',
   ];
 
   /// [input] có thể là URL đầy đủ hoặc tên cửa hàng.
@@ -53,23 +63,21 @@ class StoreScraper {
     }
 
     try {
-      final res = await http
-          .get(Uri.parse(url), headers: {
-            'User-Agent':
-                'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 '
-                '(KHTML, like Gecko) Chrome/120 Mobile Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml',
-          })
-          .timeout(const Duration(seconds: 15));
+      final res = await http.get(url, headers: {
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 '
+            '(KHTML, like Gecko) Chrome/120 Mobile Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml',
+      }).timeout(const Duration(seconds: 15));
 
       if (res.statusCode != 200) {
         return ScrapeResult(kDemoGlasses,
             usedFallback: true,
-            message: 'Không tải được trang (HTTP ${res.statusCode}). Dùng mẫu.');
+            message:
+                'Không tải được trang (HTTP ${res.statusCode}). Dùng mẫu.');
       }
 
       final doc = html_parser.parse(res.body);
-      final base = Uri.parse(url);
+      final base = url;
 
       final found = <Glasses>[];
       found.addAll(_fromJsonLd(doc, base));
@@ -95,8 +103,7 @@ class StoreScraper {
   // ---- Chiến lược 1: JSON-LD schema.org/Product ----
   List<Glasses> _fromJsonLd(Document doc, Uri base) {
     final out = <Glasses>[];
-    final scripts =
-        doc.querySelectorAll('script[type="application/ld+json"]');
+    final scripts = doc.querySelectorAll('script[type="application/ld+json"]');
     var i = 0;
     for (final s in scripts) {
       try {
@@ -104,8 +111,8 @@ class StoreScraper {
         for (final node in _flattenJsonLd(data)) {
           if (node is! Map) continue;
           final type = node['@type'];
-          final isProduct = (type == 'Product') ||
-              (type is List && type.contains('Product'));
+          final isProduct =
+              (type == 'Product') || (type is List && type.contains('Product'));
           if (!isProduct) continue;
 
           final name = (node['name'] ?? '').toString();
@@ -175,7 +182,7 @@ class StoreScraper {
 
       out.add(Glasses(
         id: 'h_${i++}',
-        name: name.isEmpty ? 'Mẫu kính ${i}' : name,
+        name: name.isEmpty ? 'Mẫu kính $i' : name,
         price: _extractPrice(text),
         thumbnailUrl: _abs(base, src),
         shape: _guessShape('$name $text'),
@@ -214,8 +221,7 @@ class StoreScraper {
   }
 
   String? _extractPrice(String text) {
-    final m = RegExp(r'(\d[\d.,]{2,})\s*(đ|vnđ|vnd|₫|\$)',
-            caseSensitive: false)
+    final m = RegExp(r'(\d[\d.,]{2,})\s*(đ|vnđ|vnd|₫|\$)', caseSensitive: false)
         .firstMatch(text);
     return m?.group(0);
   }
