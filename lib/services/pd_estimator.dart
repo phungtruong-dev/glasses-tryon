@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 /// Kết quả ước lượng PD và gợi ý size gọng.

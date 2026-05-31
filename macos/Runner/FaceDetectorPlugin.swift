@@ -122,9 +122,18 @@ class FaceDetectorPlugin: NSObject, FlutterPlugin {
 
                 let (leX, leY) = toPixel(lc)
                 let (reX, reY) = toPixel(rc)
-                let yaw = face.yaw?.doubleValue ?? 0.0
+                // Convert Vision radians → degrees to match MLKit convention used by drawGlassesAtEyes.
+                let toDeg = 180.0 / Double.pi
+                let yawDeg = (face.yaw?.doubleValue ?? 0.0) * toDeg
+                // pitch is only available on macOS 12+; fall back to 0 on older systems.
+                let pitchDeg: Double
+                if #available(macOS 12.0, *) {
+                    pitchDeg = (face.pitch?.doubleValue ?? 0.0) * toDeg
+                } else {
+                    pitchDeg = 0.0
+                }
 
-                return [leX, leY, reX, reY, yaw]
+                return [leX, leY, reX, reY, yawDeg, pitchDeg]
             }
 
             DispatchQueue.main.async { result(mapped) }

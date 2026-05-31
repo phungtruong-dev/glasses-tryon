@@ -48,6 +48,7 @@ class GlassesPainter extends CustomPainter {
         glasses,
         overlayImage: overlayImage,
         headYaw: face.headEulerAngleY ?? 0,
+        headPitch: face.headEulerAngleX ?? 0,
       );
     }
   }

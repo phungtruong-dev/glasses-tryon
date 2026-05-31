@@ -43,6 +43,7 @@ class MacOSGlassesPainter extends CustomPainter {
         canvas, pL, pR, glasses,
         overlayImage: overlayImage,
         headYaw: face.yaw,
+        headPitch: face.pitch,
       );
     }
   }

@@ -6,11 +6,13 @@ import 'package:flutter/material.dart';
 class FaceResult {
   final Offset leftEye;
   final Offset rightEye;
-  final double yaw; // head yaw in degrees
+  final double yaw;   // head yaw in degrees (left/right)
+  final double pitch; // head pitch in degrees (up/down)
 
   const FaceResult({
     required this.leftEye,
     required this.rightEye,
     this.yaw = 0,
+    this.pitch = 0,
   });
 }

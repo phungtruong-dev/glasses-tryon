@@ -21,6 +21,7 @@ void drawGlassesAtEyes(
   Glasses glasses, {
   ui.Image? overlayImage,
   double headYaw = 0,
+  double headPitch = 0,
 }) {
   final center = Offset((leftEye.dx + rightEye.dx) / 2,
       (leftEye.dy + rightEye.dy) / 2);
@@ -33,21 +34,27 @@ void drawGlassesAtEyes(
   final glassesWidth = eyeDist * 2.3;
   final glassesHeight = glassesWidth * 0.42;
 
-  // 2.5D: khi quay đầu, bề ngang kính co lại theo cos(yaw).
-  final yawRad = headYaw * math.pi / 180.0;
+  // 2.5D perspective: horizontal compression from yaw, vertical from pitch.
+  final yawRad   = headYaw   * math.pi / 180.0;
+  final pitchRad = headPitch * math.pi / 180.0;
   final scaleX = math.cos(yawRad).abs().clamp(0.45, 1.0);
+  final scaleY = math.cos(pitchRad).abs().clamp(0.55, 1.0);
 
   canvas.save();
   canvas.translate(center.dx, center.dy);
   canvas.rotate(angle);
-  canvas.scale(scaleX, 1.0);
+  canvas.scale(scaleX, scaleY);
 
   if (overlayImage != null) {
     final src = Rect.fromLTWH(
         0, 0, overlayImage.width.toDouble(), overlayImage.height.toDouble());
     final dst = Rect.fromCenter(
         center: Offset.zero, width: glassesWidth, height: glassesHeight);
-    canvas.drawImageRect(overlayImage, src, dst, Paint());
+    // BlendMode.multiply: white pixels (bg) × face = face (disappears),
+    // dark frame pixels × face = dark (shows up). Works for both transparent
+    // PNGs and white-background product photos.
+    canvas.drawImageRect(
+        overlayImage, src, dst, Paint()..blendMode = BlendMode.multiply);
   } else {
     _drawVectorFrame(canvas, glassesWidth, glassesHeight, glasses);
   }
@@ -61,7 +68,7 @@ void _drawVectorFrame(Canvas canvas, double w, double h, Glasses glasses) {
     ..strokeWidth = math.max(2.0, w * 0.022)
     ..strokeCap = StrokeCap.round;
   final lensFill = Paint()
-    ..color = Colors.white.withOpacity(0.10)
+    ..color = Colors.white.withValues(alpha: 0.10)
     ..style = PaintingStyle.fill;
 
   final lensW = w * 0.42;

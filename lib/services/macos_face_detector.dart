@@ -44,6 +44,7 @@ class MacOSFaceDetector {
               rightEye: Offset(
                   (e[2] as num).toDouble(), (e[3] as num).toDouble()),
               yaw: (e[4] as num).toDouble(),
+              pitch: e.length >= 6 ? (e[5] as num).toDouble() : 0.0,
             ))
         .toList();
   }
