@@ -11,16 +11,18 @@ import '../models/glasses.dart';
 import '../screens/result_screen.dart';
 import '../services/capture_service.dart';
 import '../services/macos_face_detector.dart';
-import 'glasses_selector.dart';
 import 'macos_glasses_painter.dart';
 
 /// Full-screen camera + AR overlay body for macOS.
 /// Manages camera_macos lifecycle, periodic Vision face detection, and capture.
+/// UI chrome (buttons, selectors) is owned by the parent [TryOnScreen].
 class MacOSArBody extends StatefulWidget {
   final Glasses selected;
   final List<Glasses>? catalog;
   final ui.Image? overlayImage;
   final ValueChanged<Glasses> onSelectGlasses;
+  /// Called whenever face-detection state changes (true = face found).
+  final ValueChanged<bool>? onFaceDetected;
 
   const MacOSArBody({
     super.key,
@@ -28,13 +30,15 @@ class MacOSArBody extends StatefulWidget {
     required this.overlayImage,
     required this.onSelectGlasses,
     this.catalog,
+    this.onFaceDetected,
   });
 
   @override
-  State<MacOSArBody> createState() => _MacOSArBodyState();
+  State<MacOSArBody> createState() => MacOSArBodyState();
 }
 
-class _MacOSArBodyState extends State<MacOSArBody> {
+// Public so TryOnScreen can call triggerCapture() via GlobalKey.
+class MacOSArBodyState extends State<MacOSArBody> {
   CameraMacOSController? _controller;
   final _detector = MacOSFaceDetector();
   final _capture = CaptureService();
@@ -69,15 +73,22 @@ class _MacOSArBodyState extends State<MacOSArBody> {
     try {
       final faces = await _detector.detectFromImageData(frame);
       if (mounted) {
+        final wasEmpty = _faces.isEmpty;
         setState(() {
           _faces = faces;
           _imageSize = Size(frame.width.toDouble(), frame.height.toDouble());
         });
+        if (wasEmpty != faces.isEmpty) {
+          widget.onFaceDetected?.call(faces.isNotEmpty);
+        }
       }
     } finally {
       _busy = false;
     }
   }
+
+  /// Called by [TryOnScreen] when the shutter button is tapped.
+  Future<void> triggerCapture() => _onCapture();
 
   Future<void> _onCapture() async {
     final c = _controller;
@@ -131,10 +142,6 @@ class _MacOSArBodyState extends State<MacOSArBody> {
 
   @override
   Widget build(BuildContext context) {
-    final catalog = (widget.catalog != null && widget.catalog!.isNotEmpty)
-        ? widget.catalog!
-        : kDemoGlasses;
-
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -153,7 +160,7 @@ class _MacOSArBodyState extends State<MacOSArBody> {
                   child: CircularProgressIndicator(color: Colors.white)),
         ),
 
-        // Glasses overlay
+        // AR glasses overlay
         if (_imageSize != Size.zero)
           LayoutBuilder(builder: (ctx, c) {
             return CustomPaint(
@@ -166,56 +173,6 @@ class _MacOSArBodyState extends State<MacOSArBody> {
               ),
             );
           }),
-
-        // Face detection status badge
-        Positioned(
-          top: 12,
-          left: 0,
-          right: 0,
-          child: Center(
-            child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.black54,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                _faces.isEmpty
-                    ? 'Đưa khuôn mặt vào khung hình…'
-                    : 'Đã nhận diện khuôn mặt ✓',
-                style: const TextStyle(color: Colors.white),
-              ),
-            ),
-          ),
-        ),
-
-        // Capture button
-        Positioned(
-          bottom: 104,
-          left: 0,
-          right: 0,
-          child: Center(
-            child: FloatingActionButton.large(
-              onPressed: _capturing ? null : _onCapture,
-              child: _capturing
-                  ? const CircularProgressIndicator()
-                  : const Icon(Icons.camera_alt),
-            ),
-          ),
-        ),
-
-        // Glasses selector strip
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: 0,
-          child: GlassesSelector(
-            options: catalog,
-            selectedId: widget.selected.id,
-            onSelect: widget.onSelectGlasses,
-          ),
-        ),
       ],
     );
   }

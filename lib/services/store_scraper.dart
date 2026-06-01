@@ -131,7 +131,7 @@ class StoreScraper {
           out.add(Glasses(
             id: 'jsonld_${i++}',
             name: name,
-            price: price,
+            price: _parsePriceStr(price),
             thumbnailUrl: img == null ? null : _abs(base, img),
             shape: _guessShape(name),
             productUrl: node['url']?.toString(),
@@ -316,12 +316,17 @@ class StoreScraper {
     return FrameShape.rectangle;
   }
 
-  String? _extractPrice(String text) {
-    final m = RegExp(
-            r'(\d[\d.,]{2,})\s*(đ|vnđ|vnd|₫|\$)',
-            caseSensitive: false)
-        .firstMatch(text);
-    return m?.group(0);
+  int _extractPrice(String text) {
+    final m = RegExp(r'(\d[\d.,]{2,})\s*(đ|vnđ|vnd|₫|\$)', caseSensitive: false).firstMatch(text);
+    if (m == null) return 0;
+    final digits = m.group(1)!.replaceAll(RegExp(r'[.,]'), '');
+    return int.tryParse(digits) ?? 0;
+  }
+
+  int _parsePriceStr(String? s) {
+    if (s == null) return 0;
+    final digits = s.replaceAll(RegExp(r'[^\d]'), '');
+    return int.tryParse(digits) ?? 0;
   }
 
   String _abs(Uri base, String src) {

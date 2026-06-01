@@ -26,7 +26,7 @@ class ApiService {
       return Glasses(
         id: p['id'].toString(),
         name: (p['name'] ?? 'Kính').toString(),
-        price: p['price']?.toString(),
+        price: _parsePrice(p['price']?.toString()),
         thumbnailUrl: (p['thumbnail_url'] ?? overlay)?.toString(),
         // overlay_url là ảnh PNG tách nền dùng để dán lên mặt.
         overlayAsset: overlay == null ? null : _abs(overlay),
@@ -34,6 +34,12 @@ class ApiService {
         frameColor: _colorFrom(p['color']?.toString()),
       );
     }).toList();
+  }
+
+  int _parsePrice(String? s) {
+    if (s == null) return 0;
+    final digits = s.replaceAll(RegExp(r'[^\d]'), '');
+    return int.tryParse(digits) ?? 0;
   }
 
   String _abs(String path) {

@@ -6,7 +6,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../main.dart';
 import '../services/capture_service.dart';
-import 'pd_screen.dart';
+import 'pd_measure_screen.dart';
 
 /// Captures a portrait photo then opens PdScreen for pupillary-distance measurement.
 /// Uses camera_macos on macOS, camera package on iOS/Android.
